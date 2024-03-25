@@ -76,7 +76,8 @@ def main():
                 save_path = os.path.join(output_dir, "slices_{}.png".format(f[5:9]))
                 plotSlices(image, label, save_path)
             except:
-                raise Exception("Couldn't open {}".format(f[5:9]))
+                print("Couldn't open {}".format(f[5:9]))
+                continue
 
 
 if __name__ == "__main__":
