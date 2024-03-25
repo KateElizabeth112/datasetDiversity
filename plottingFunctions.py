@@ -89,3 +89,4 @@ def plotSlices(image, label, save_path):
 
     plt.tight_layout()
     plt.savefig(save_path)
+    plt.close()
