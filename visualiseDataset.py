@@ -21,8 +21,8 @@ if dataset == "TS":
     else:
         raise Exception("Local flag is not recognised. Must be set to local or remote.")
 
-    image_dir = os.path.join(root_dir, "nnUNet_raw", "Dataset300_Full", "imagesTr")
-    gt_seg_dir = os.path.join(root_dir, "nnUNet_raw", "Dataset300_Full", "labelsTr")
+    image_dir = os.path.join(root_dir, "nnUNet_raw", "Dataset999_Full", "imagesTr")
+    gt_seg_dir = os.path.join(root_dir, "nnUNet_raw", "Dataset999_Full", "labelsTr")
 
 elif dataset == "AMOS":
     if local == "local":
