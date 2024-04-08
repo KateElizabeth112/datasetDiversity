@@ -104,17 +104,17 @@ def getExtents(organ):
             label_idx[label == organ_idx] = 1
 
             # Check that this sums to more than zero
-            if np.sum(label_idx) == 0:
-                raise Exception("The organ with index {} does not have any labels for image {}".format(organ_idx, fn))
+            if np.sum(label_idx) > 0:
+                # sum along each pair of axes to find the maximum extent for the third axis
+                x_sum = np.sum(label_idx, axis=(1, 2))
+                y_sum = np.sum(label_idx, axis=(0, 2))
+                z_sum = np.sum(label_idx, axis=(0, 1))
 
-            # sum along each pair of axes to find the maximum extent for the third axis
-            x_sum = np.sum(label_idx, axis=(1, 2))
-            y_sum = np.sum(label_idx, axis=(0, 2))
-            z_sum = np.sum(label_idx, axis=(0, 1))
-
-            x_extents.append(np.max(x_sum))
-            y_extents.append(np.max(y_sum))
-            z_extents.append(np.max(z_sum))
+                x_extents.append(np.max(x_sum))
+                y_extents.append(np.max(y_sum))
+                z_extents.append(np.max(z_sum))
+            else:
+                print("The organ with index {} does not have any labels for image {}".format(organ_idx, fn))
 
     # save the x, y and z extents
     f = open(os.path.join(root_dir, "{}_extents.pkl".format(organ)), "wb")
