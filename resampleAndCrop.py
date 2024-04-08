@@ -60,7 +60,7 @@ def resample():
 
             original_spacing = original_img.header.get_zooms()
 
-            if original_spacing != target_spacing:
+            if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
                 print("Resampling of image {} required".format(fn))
                 # Resample the image to the target voxel sizes
                 #resampled_img = resample_to_output(original_img, voxel_sizes=target_voxel_sizes)
@@ -93,7 +93,7 @@ def getExtents(organ):
             # convert label to numpy array
             label = label_nii.get_fdata()
 
-            if spacing != target_spacing:
+            if np.max(np.abs(np.array(spacing) - np.array(target_spacing))) > 0.0001:
                 raise Exception("The label {} voxel spacing of {} does not match the target {} ".format(fn,
                                                                                                         spacing,
                                                                                                         target_spacing))
