@@ -7,7 +7,7 @@ import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
 
-parser = argparse.ArgumentParser(description="Just an example",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser = argparse.ArgumentParser(description="Just an example", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-d", "--dataset", default="TS", help="Task to evaluate")
 parser.add_argument("-l", "--local", default="local", help="Are we running on local or remote")
 args = vars(parser.parse_args())
@@ -49,7 +49,8 @@ elif dataset == "AMOS":
 
 image_dir = os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr")
 label_dir = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr")
-target_spacing = (1.5, 1.5, 1.5)        # target voxel size
+target_spacing = (1.5, 1.5, 1.5)  # target voxel size
+
 
 def resample():
     filenames = os.listdir(image_dir)
@@ -64,10 +65,10 @@ def resample():
             if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
                 print("Resampling of image {} required".format(fn))
                 # Resample the image to the target voxel sizes
-                #resampled_img = resample_to_output(original_img, voxel_sizes=target_voxel_sizes)
+                # resampled_img = resample_to_output(original_img, voxel_sizes=target_voxel_sizes)
 
                 # Save the resampled image
-                #nib.save(resampled_img, 'resampled_image.nii.gz')
+                # nib.save(resampled_img, 'resampled_image.nii.gz')
 
                 # TODO remember to also resample the label
 
@@ -124,9 +125,11 @@ def getExtents(organ):
 
     # print the maximum
     print("Maximum {0} extents (x, y, z) in voxels: ({1}, {2}, {3})".format(organ,
-                                                                        np.max(np.array(x_extents)),
-                                                                        np.max(np.array(y_extents)),
-                                                                        np.max(np.array(z_extents))))
+                                                                            np.max(np.array(x_extents)),
+                                                                            np.max(np.array(y_extents)),
+                                                                            np.max(np.array(z_extents))))
+
+    return (int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents))))
 
 
 def crop(organ, crop_extent):
@@ -141,9 +144,11 @@ def crop(organ, crop_extent):
         if fn.endswith(".nii.gz"):
             # Load the original label
             label_nii = nib.load(os.path.join(label_dir, fn))
+            label = label_nii.get_fdata()   # convert label to numpy array
 
-            # convert label to numpy array
-            label = label_nii.get_fdata()
+            # load the corresponding image
+            image_nii = nib.load(os.path.join(image_dir, fn[:9] + "_0000.nii.gz"))
+            image = image_nii.get_fdata()  # convert image to numpy array
 
             # Filter out the label idx only
             label_idx = np.zeros(label.shape)
@@ -151,51 +156,94 @@ def crop(organ, crop_extent):
 
             # Check that this sums to more than zero
             if np.sum(label_idx) > 0:
-                # sum along each axis to find the maximum extent for the third axis
-                x_sum = np.sum(label_idx, axis=(1, 2))
-                y_sum = np.sum(label_idx, axis=(0, 2))
-                z_sum = np.sum(label_idx, axis=(0, 1))
+                # sum along each pair of axes to find the plane with maximum area for the third axis
+                x_area = np.sum(label_idx, axis=(1, 2))
+                y_area = np.sum(label_idx, axis=(0, 2))
+                z_area = np.sum(label_idx, axis=(0, 1))
 
                 # find the index of the start and end point, and the origin as the midpoint
-                x_1 = np.nonzero(x_sum)[0][0]
-                x_2 = np.nonzero(x_sum)[0][-1]
+                x_1 = np.nonzero(x_area)[0][0]
+                x_2 = np.nonzero(x_area)[0][-1]
                 x_0 = int(np.round(0.5 * (x_1 + x_2)))
 
-                y_1 = np.nonzero(y_sum)[0][0]
-                y_2 = np.nonzero(y_sum)[0][-1]
+                y_1 = np.nonzero(y_area)[0][0]
+                y_2 = np.nonzero(y_area)[0][-1]
                 y_0 = int(np.round(0.5 * (y_1 + y_2)))
 
-                z_1 = np.nonzero(z_sum)[0][0]
-                z_2 = np.nonzero(z_sum)[0][-1]
+                z_1 = np.nonzero(z_area)[0][0]
+                z_2 = np.nonzero(z_area)[0][-1]
                 z_0 = int(np.round(0.5 * (z_1 + z_2)))
 
-                # get the bounding box for the x_z_plane
+                # get the bounding box for all planes
                 x_min = int(x_0 - crop_extent[0] / 2)
                 x_max = int(x_0 + crop_extent[0] / 2)
+
+                y_min = int(y_0 - crop_extent[1] / 2)
+                y_max = int(y_0 + crop_extent[0] / 2)
 
                 z_min = int(z_0 - crop_extent[2] / 2)
                 z_max = int(z_0 + crop_extent[2] / 2)
 
-                # plot the x_z plane sliced through the y-origin
-                x_z_plane = label_idx[:, y_0, :]
+                # crop the label and image
+                label_crop = label_idx[np.max((0, x_min)):x_max, np.max((0, y_min)):y_max, np.max((0, z_min)):z_max]
+                image_crop = image[np.max((0, x_min)):x_max, np.max((0, y_min)):y_max, np.max((0, z_min)):z_max]
+
+                # check if we need to do any padding (i.e. if the cropping planes are outside bounds of original image)
+                if np.sum(crop_extent) > np.sum(label_crop.shape):
+
+                    if x_min >= 0:
+                        x_min_offset = 0
+                    elif x_min < 0:
+                        x_min_offset = abs(x_min)
+
+                    if y_min >= 0:
+                        y_min_offset = 0
+                    elif y_min < 0:
+                        y_min_offset = abs(y_min)
+
+                    if z_min >= 0:
+                        z_min_offset = 0
+                    elif z_min < 0:
+                        z_min_offset = abs(z_min)
+
+                    label_crop_padded = np.zeros(crop_extent)
+                    image_crop_padded = np.zeros(crop_extent)
+
+                    label_crop_padded.fill(0.5)
+                    image_crop_padded.fill(np.mean(image_crop))
+
+                    label_crop_padded[x_min_offset:x_min_offset + label_crop.shape[0],
+                    y_min_offset:y_min_offset + label_crop.shape[1],
+                    z_min_offset:z_min_offset + label_crop.shape[2]] = label_crop
+
+                    image_crop_padded[x_min_offset:x_min_offset + label_crop.shape[0],
+                    y_min_offset:y_min_offset + label_crop.shape[1],
+                    z_min_offset:z_min_offset + label_crop.shape[2]] = image_crop
+
+                    label_crop = label_crop_padded
+                    image_crop = image_crop_padded
+
+                # plot each plane sliced through the centre of the image
                 plt.clf()
-                plt.imshow(np.rot90(x_z_plane), origin='lower')
-                #plt.axvline(z_min)
-                #plt.axvline(z_max)
-                #plt.axhline(x_min)
-                #plt.axhline(x_max)
-                #plt.scatter(z_0, x_0)
-                plt.axvline(x_0)
-                #plt.axvline(x_1)
-                #plt.axvline(x_2)
+                fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
+                ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
+
+                ax1.imshow(np.rot90(label_crop[int(crop_extent[0]/2), :, :]), origin='lower')
+                ax2.imshow(np.rot90(label_crop[:, int(crop_extent[1]/2), :]), origin='lower')
+                ax3.imshow(np.rot90(label_crop[:, :, int(crop_extent[2]/2)]), origin='lower')
+
+                ax4.imshow(np.rot90(image_crop[int(crop_extent[0]/2), :, :]), origin='lower', cmap="gray")
+                ax5.imshow(np.rot90(image_crop[:, int(crop_extent[1]/2), :]), origin='lower', cmap="gray")
+                ax6.imshow(np.rot90(image_crop[:, :, int(crop_extent[2]/2)]), origin='lower', cmap="gray")
+
                 plt.show()
 
 
-
 def main():
-    #resample()
-    getExtents("liver")
-    #crop("liver", (60, 60, 60))
+    # resample()
+    extents = getExtents("liver")
+    crop("liver", extents)
+
 
 if __name__ == "__main__":
     main()
