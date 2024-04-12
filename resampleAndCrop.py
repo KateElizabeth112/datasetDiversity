@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
+from gzip import BadGzipFile
 
 parser = argparse.ArgumentParser(description="Just an example", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-d", "--dataset", default="TS", help="Task to evaluate")
@@ -86,37 +87,42 @@ def getExtents(organ):
 
     for fn in filenames:
         if fn.endswith(".nii.gz"):
-            # Load the original label
-            label_nii = nib.load(os.path.join(label_dir, fn))
-
-            # check that the spacing matches the target spacing
-            spacing = label_nii.header.get_zooms()
-
-            # convert label to numpy array
-            label = label_nii.get_fdata()
-
-            if np.max(np.abs(np.array(spacing) - np.array(target_spacing))) > 0.0001:
-                raise Exception("The label {} voxel spacing of {} does not match the target {} ".format(fn,
-                                                                                                        spacing,
-                                                                                                        target_spacing))
-
-            # Find the x, y and z extents of the organ with index idx
-            # Filter out the label idx only
-            label_idx = np.zeros(label.shape)
-            label_idx[label == organ_idx] = 1
-
-            # Check that this sums to more than zero
-            if np.sum(label_idx) > 0:
-                # sum along each pair of axes to find the maximum extent for the third axis
-                x_sum = np.sum(label_idx, axis=1)
-                y_sum = np.sum(label_idx, axis=2)
-                z_sum = np.sum(label_idx, axis=0)
-
-                x_extents.append(np.max(x_sum))
-                y_extents.append(np.max(y_sum))
-                z_extents.append(np.max(z_sum))
+            try:
+                # Load the original label
+                label_nii = nib.load(os.path.join(label_dir, fn))
+            except BadGzipFile:
+                print("The file {} did not pass CRC check".format(fn))
+            except Exception as e:
+                print("An unexpected error {} occured".format(e))
             else:
-                print("The organ with index {} does not have any labels for image {}".format(organ_idx, fn))
+                # check that the spacing matches the target spacing
+                spacing = label_nii.header.get_zooms()
+
+                # convert label to numpy array
+                label = label_nii.get_fdata()
+
+                if np.max(np.abs(np.array(spacing) - np.array(target_spacing))) > 0.0001:
+                    raise Exception("The label {} voxel spacing of {} does not match the target {} ".format(fn,
+                                                                                                            spacing,
+                                                                                                            target_spacing))
+
+                # Find the x, y and z extents of the organ with index idx
+                # Filter out the label idx only
+                label_idx = np.zeros(label.shape)
+                label_idx[label == organ_idx] = 1
+
+                # Check that this sums to more than zero
+                if np.sum(label_idx) > 0:
+                    # sum along each pair of axes to find the maximum extent for the third axis
+                    x_sum = np.sum(label_idx, axis=1)
+                    y_sum = np.sum(label_idx, axis=2)
+                    z_sum = np.sum(label_idx, axis=0)
+
+                    x_extents.append(np.max(x_sum))
+                    y_extents.append(np.max(y_sum))
+                    z_extents.append(np.max(z_sum))
+                else:
+                    print("The organ with index {} does not have any labels for image {}".format(organ_idx, fn))
 
     # save the x, y and z extents
     f = open(os.path.join(root_dir, "{}_extents.pkl".format(organ)), "wb")
@@ -165,8 +171,10 @@ def crop(organ):
                 # load the corresponding image
                 image_nii = nib.load(os.path.join(image_dir, fn[:9] + "_0000.nii.gz"))
                 image = image_nii.get_fdata()  # convert image to numpy array
-            except:
-                print("File {} could not be opened".format(fn))
+            except BadGzipFile:
+                print("File {} failed CRC check".format(fn))
+            except Exception as e:
+                print("An unexpected error {} occured".format(e))
             else:
                 # Filter out the label idx only
                 label_idx = np.zeros(label.shape)
