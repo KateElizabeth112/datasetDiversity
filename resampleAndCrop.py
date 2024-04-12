@@ -123,22 +123,37 @@ def getExtents(organ):
     pkl.dump([x_extents, y_extents, z_extents], f)
     f.close()
 
-    # print the maximum
+    # Choose the maximum extents
+    crop_extent = [int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents)))]
+
+    # Make sure they are divisible by 2
+    for j in range(0, len(crop_extent)):
+        if (crop_extent[j] % 2) > 0:
+            crop_extent[j] = crop_extent[j] + 1
+
+    # print the maximum extents
     print("Maximum {0} extents (x, y, z) in voxels: ({1}, {2}, {3})".format(organ,
-                                                                            np.max(np.array(x_extents)),
-                                                                            np.max(np.array(y_extents)),
-                                                                            np.max(np.array(z_extents))))
+                                                                            crop_extent[0],
+                                                                            crop_extent[1],
+                                                                            crop_extent[2]))
 
-    return (int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents))))
+    # Save them somewhere for reading back
+    f = open(os.path.join(root_dir, "{}_crop_extent.pkl".format(organ)), "wb")
+    pkl.dump(crop_extent, f)
+    f.close()
 
 
-def crop(organ, crop_extent):
+def crop(organ):
     # Crop the images to a window of size crop_extend, centering the organ in the volume
     print("Crop images")
 
     filenames = os.listdir(label_dir)
-
     organ_idx = organ_dict.get(organ)
+
+    # open the crop extents for the dataset and the organ
+    f = open(os.path.join(root_dir, "{}_crop_extent.pkl".format(organ)), "rb")
+    crop_extent = pkl.load(f)
+    f.close()
 
     for fn in filenames:
         if fn.endswith(".nii.gz"):
@@ -179,7 +194,7 @@ def crop(organ, crop_extent):
                 x_max = int(x_0 + crop_extent[0] / 2)
 
                 y_min = int(y_0 - crop_extent[1] / 2)
-                y_max = int(y_0 + crop_extent[0] / 2)
+                y_max = int(y_0 + crop_extent[1] / 2)
 
                 z_min = int(z_0 - crop_extent[2] / 2)
                 z_max = int(z_0 + crop_extent[2] / 2)
@@ -236,13 +251,24 @@ def crop(organ, crop_extent):
                 ax5.imshow(np.rot90(image_crop[:, int(crop_extent[1]/2), :]), origin='lower', cmap="gray")
                 ax6.imshow(np.rot90(image_crop[:, :, int(crop_extent[2]/2)]), origin='lower', cmap="gray")
 
-                plt.show()
+                # save the image
+                # check we have a directory to save the images
+                if not os.path.exists(os.path.join(root_dir, "images", "crops")):
+                    os.mkdir(os.path.join(root_dir, "images", "crops"))
+
+                if not os.path.exists(os.path.join(root_dir, "images", "crops", organ)):
+                    os.mkdir(os.path.join(root_dir, "images", "crops", organ))
+
+                plt.savefig(os.path.join(root_dir, "images", "crops", organ, fn[:9] + ".png"))
 
 
 def main():
     # resample()
-    extents = getExtents("liver")
-    crop("liver", extents)
+    organs = ["right kidney", "left kidney", "liver", "pancreas"]
+
+    for organ in organs:
+        getExtents(organ)
+        crop(organ)
 
 
 if __name__ == "__main__":
