@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from gzip import BadGzipFile
 
 parser = argparse.ArgumentParser(description="Just an example", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("-d", "--dataset", default="TS", help="Task to evaluate")
+parser.add_argument("-d", "--dataset", default="AMOS", help="Task to evaluate")
 parser.add_argument("-l", "--local", default="local", help="Are we running on local or remote")
 args = vars(parser.parse_args())
 
@@ -63,8 +63,10 @@ def resample():
 
             original_spacing = original_img.header.get_zooms()
 
-            if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
-                print("Resampling of image {} required".format(fn))
+            print(original_spacing)
+
+            #if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
+            #    print("Resampling of image {} required".format(fn))
                 # Resample the image to the target voxel sizes
                 # resampled_img = resample_to_output(original_img, voxel_sizes=target_voxel_sizes)
 
@@ -271,15 +273,16 @@ def crop(organ):
                         os.mkdir(os.path.join(root_dir, "images", "crops", organ))
 
                     plt.savefig(os.path.join(root_dir, "images", "crops", organ, fn[:9] + ".png"))
+                    plt.close()
 
 
 def main():
-    # resample()
-    organs = ["right kidney", "left kidney", "liver", "pancreas"]
+    resample()
+    #organs = ["right kidney", "left kidney", "liver", "pancreas"]
 
-    for organ in organs:
-        getExtents(organ)
-        crop(organ)
+    #for organ in organs:
+    #    getExtents(organ)
+    #    crop(organ)
 
 
 if __name__ == "__main__":

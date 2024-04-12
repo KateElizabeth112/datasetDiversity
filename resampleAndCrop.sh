@@ -9,4 +9,4 @@ cd ${PBS_O_WORKDIR}
 module load anaconda3/personal
 source activate nnUNetv2
 
-python3 resampleAndCrop.py -d "TS" -l "remote"
+python3 resampleAndCrop.py -d "AMOS" -l "remote"
