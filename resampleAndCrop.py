@@ -1,12 +1,12 @@
 # Resample and crop the images in a target folder
 import nibabel as nib
-from nibabel.processing import resample_to_output
 import os
 import argparse
 import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
 from gzip import BadGzipFile
+import SimpleITK as sitk
 
 parser = argparse.ArgumentParser(description="Just an example", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-d", "--dataset", default="AMOS", help="Task to evaluate")
@@ -32,6 +32,8 @@ if dataset == "TS":
                   "liver": 3,
                   "pancreas": 4}
 
+    target_spacing = [1.5, 1.5, 1.5]  # target voxel size
+
 elif dataset == "AMOS":
     if local == "local":
         root_dir = "/Users/katecevora/Documents/PhD/data/AMOS_3D"
@@ -48,9 +50,39 @@ elif dataset == "AMOS":
                   "liver": 6,
                   "pancreas": 10}
 
+    target_spacing = [0.7, 0.7, 2.0]  # target voxel size
+
 image_dir = os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr")
 label_dir = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr")
-target_spacing = (1.5, 1.5, 1.5)  # target voxel size
+
+image_dir_resampled = os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_resampled")
+label_dir_resampled = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled")
+
+
+def resample_img(itk_image, out_spacing=[2.0, 2.0, 2.0], is_label=False):
+    # Resample images to 2mm spacing with SimpleITK
+    original_spacing = itk_image.GetSpacing()
+    original_size = itk_image.GetSize()
+
+    out_size = [
+        int(np.round(original_size[0] * (original_spacing[0] / out_spacing[0]))),
+        int(np.round(original_size[1] * (original_spacing[1] / out_spacing[1]))),
+        int(np.round(original_size[2] * (original_spacing[2] / out_spacing[2])))]
+
+    resample = sitk.ResampleImageFilter()
+    resample.SetOutputSpacing(out_spacing)
+    resample.SetSize(out_size)
+    resample.SetOutputDirection(itk_image.GetDirection())
+    resample.SetOutputOrigin(itk_image.GetOrigin())
+    resample.SetTransform(sitk.Transform())
+    resample.SetDefaultPixelValue(itk_image.GetPixelIDValue())
+
+    if is_label:
+        resample.SetInterpolator(sitk.sitkNearestNeighbor)
+    else:
+        resample.SetInterpolator(sitk.sitkBSpline)
+
+    return resample.Execute(itk_image)
 
 
 def resample():
@@ -59,26 +91,110 @@ def resample():
     for fn in filenames:
         if fn.endswith(".nii.gz"):
             # Load the original image
-            original_img = nib.load(os.path.join(image_dir, fn))
+            image_sitk = sitk.ReadImage(os.path.join(image_dir, fn))
+            original_spacing = image_sitk.GetSpacing()
 
-            original_spacing = original_img.header.get_zooms()
+            # Check whether we need to resample (if the original and target spacing differ)
+            if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
+                print("Resampling of image {} required".format(fn))
 
-            print(original_spacing)
-
-            #if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
-            #    print("Resampling of image {} required".format(fn))
                 # Resample the image to the target voxel sizes
-                # resampled_img = resample_to_output(original_img, voxel_sizes=target_voxel_sizes)
+                image_resampled = resample_img(image_sitk, out_spacing=target_spacing, is_label=False)
 
-                # Save the resampled image
-                # nib.save(resampled_img, 'resampled_image.nii.gz')
+                # load the label and resample
+                label_sitk = sitk.ReadImage(os.path.join(label_dir, fn[0:9] + ".nii.gz"))
+                label_resampled = resample_img(label_sitk, out_spacing=target_spacing, is_label=True)
 
-                # TODO remember to also resample the label
+                # Make some checks
+                assert np.max(np.abs(np.array(image_resampled.GetSpacing()) - np.array(
+                    target_spacing))) < 0.0001, "Spacing of resampled image voxels does not match target"
+
+                assert np.max(np.abs(np.array(label_resampled.GetSpacing()) - np.array(
+                    target_spacing))) < 0.0001, "Spacing of resampled label voxels does not match target"
+
+                assert label_resampled.GetSize() == image_resampled.GetSize(), "Resampled image and label are not the same size"
+
+                # debug only, check how the images look before and after resampling
+                organs = ["right kidney", "left kidney", "liver", "pancreas"]
+                for o in organs:
+                    organ_idx = organ_dict.get(o)
+
+                    # convert label and image to numpy array
+                    image_np = sitk.GetArrayFromImage(image_sitk)
+                    label_np = sitk.GetArrayFromImage(label_sitk)
+
+                    # filter the label for just one organ
+                    label_np_o = np.zeros(label_np.shape)
+                    label_np_o[label_np == organ_idx] = 1
+
+                    # plot each plane sliced through the centre of the image
+                    plt.clf()
+                    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
+                    ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
+
+                    ax1.imshow(np.rot90(label_np_o[int(label_np_o.shape[0] / 2), :, :]), origin='lower')
+                    ax2.imshow(np.rot90(label_np_o[:, int(label_np_o.shape[1] / 2), :]), origin='lower')
+                    ax3.imshow(np.rot90(label_np_o[:, :, int(label_np_o.shape[2] / 2)]), origin='lower')
+
+                    ax4.imshow(np.rot90(image_np[int(image_np.shape[0] / 2), :, :]), origin='lower', cmap="gray")
+                    ax5.imshow(np.rot90(image_np[:, int(image_np.shape[1] / 2), :]), origin='lower', cmap="gray")
+                    ax6.imshow(np.rot90(image_np[:, :, int(image_np.shape[2] / 2)]), origin='lower', cmap="gray")
+                    plt.suptitle(o)
+
+                    # save the image
+                    # check we have a directory to save the images
+                    if not os.path.exists(os.path.join(root_dir, "images", "resampled")):
+                        os.mkdir(os.path.join(root_dir, "images", "resampled"))
+
+                    if not os.path.exists(os.path.join(root_dir, "images", "resampled", o)):
+                        os.mkdir(os.path.join(root_dir, "images", "resampled", o))
+
+                    plt.savefig(os.path.join(root_dir, "images", "resampled", o, fn[:9] + ".png"))
+                    plt.close()
+
+                    # convert label and image to numpy array
+                    image_np_resampled = sitk.GetArrayFromImage(image_resampled)
+                    label_np_resampled = sitk.GetArrayFromImage(label_resampled)
+
+                    # filter the label for just one organ
+                    label_np_o_resampled = np.zeros(label_np_resampled.shape)
+                    label_np_o_resampled[label_np_resampled == organ_idx] = 1
+
+                    # plot each plane sliced through the centre of the image
+                    plt.clf()
+                    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
+                    ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
+
+                    ax1.imshow(np.rot90(label_np_o_resampled[int(label_np_o_resampled.shape[0] / 2), :, :]), origin='lower')
+                    ax2.imshow(np.rot90(label_np_o_resampled[:, int(label_np_o_resampled.shape[1] / 2), :]), origin='lower')
+                    ax3.imshow(np.rot90(label_np_o_resampled[:, :, int(label_np_o_resampled.shape[2] / 2)]), origin='lower')
+
+                    ax4.imshow(np.rot90(image_np_resampled[int(image_np_resampled.shape[0] / 2), :, :]), origin='lower', cmap="gray")
+                    ax5.imshow(np.rot90(image_np_resampled[:, int(image_np_resampled.shape[1] / 2), :]), origin='lower', cmap="gray")
+                    ax6.imshow(np.rot90(image_np_resampled[:, :, int(image_np_resampled.shape[2] / 2)]), origin='lower', cmap="gray")
+                    plt.suptitle("{} Resampled".format(o))
+
+                    plt.savefig(os.path.join(root_dir, "images", "resampled", o, fn[:9] + "_resampled.png"))
+                    plt.close()
+
+                # Save the resampled image and label in a new folder
+                # check we have a directory to save the images
+                if not os.path.exists(os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_resampled")):
+                    os.mkdir(os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_resampled"))
+
+                if not os.path.exists(os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled")):
+                    os.mkdir(os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled"))
+
+                sitk.WriteImage(image_resampled, os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_resampled", fn))
+                sitk.WriteImage(label_resampled, os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled", fn))
 
 
 def getExtents(organ):
     # Collect the x, y and z extents of the organ with index idx so we can determine the crop window for the whole DS
-    filenames = os.listdir(label_dir)
+    if dataset == "TS":
+        filenames = os.listdir(label_dir)
+    else:
+        filenames = os.listdir(label_dir_resampled)
 
     organ_idx = organ_dict.get(organ)
 
@@ -91,7 +207,10 @@ def getExtents(organ):
         if fn.endswith(".nii.gz"):
             try:
                 # Load the original label
-                label_nii = nib.load(os.path.join(label_dir, fn))
+                if dataset == "TS":
+                    label_nii = nib.load(os.path.join(label_dir, fn))
+                else:
+                    label_nii = nib.load(os.path.join(label_dir_resampled, fn))
             except BadGzipFile:
                 print("The file {} did not pass CRC check".format(fn))
             except Exception as e:
@@ -132,7 +251,13 @@ def getExtents(organ):
     f.close()
 
     # Choose the maximum extents
-    crop_extent = [int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents)))]
+    #crop_extent = [int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents)))]
+
+    # Choose 95th percentile extent
+    per = 95
+    crop_extent = [int(np.percentile(np.array(x_extents), per)),
+                   int(np.percentile(np.array(y_extents), per)),
+                   int(np.percentile(np.array(z_extents), per))]
 
     # Make sure they are divisible by 2
     for j in range(0, len(crop_extent)):
@@ -155,7 +280,10 @@ def crop(organ):
     # Crop the images to a window of size crop_extend, centering the organ in the volume
     print("Crop images")
 
-    filenames = os.listdir(label_dir)
+    if dataset == "TS":
+        filenames = os.listdir(label_dir)
+    else:
+        filenames = os.listdir(label_dir_resampled)
     organ_idx = organ_dict.get(organ)
 
     # open the crop extents for the dataset and the organ
@@ -167,11 +295,15 @@ def crop(organ):
         if fn.endswith(".nii.gz"):
             # Load the original label
             try:
-                label_nii = nib.load(os.path.join(label_dir, fn))
-                label = label_nii.get_fdata()   # convert label to numpy array
-
-                # load the corresponding image
-                image_nii = nib.load(os.path.join(image_dir, fn[:9] + "_0000.nii.gz"))
+                if dataset == "TS":
+                    label_nii = nib.load(os.path.join(label_dir, fn))
+                    # load the corresponding image
+                    image_nii = nib.load(os.path.join(image_dir, fn[:9] + "_0000.nii.gz"))
+                else:
+                    label_nii = nib.load(os.path.join(label_dir_resampled, fn))
+                    # load the corresponding image
+                    image_nii = nib.load(os.path.join(image_dir_resampled, fn[:9] + "_0000.nii.gz"))
+                label = label_nii.get_fdata()  # convert label to numpy array
                 image = image_nii.get_fdata()  # convert image to numpy array
             except BadGzipFile:
                 print("File {} failed CRC check".format(fn))
@@ -256,13 +388,13 @@ def crop(organ):
                     fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
                     ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
 
-                    ax1.imshow(np.rot90(label_crop[int(crop_extent[0]/2), :, :]), origin='lower')
-                    ax2.imshow(np.rot90(label_crop[:, int(crop_extent[1]/2), :]), origin='lower')
-                    ax3.imshow(np.rot90(label_crop[:, :, int(crop_extent[2]/2)]), origin='lower')
+                    ax1.imshow(np.rot90(label_crop[int(crop_extent[0] / 2), :, :]), origin='lower')
+                    ax2.imshow(np.rot90(label_crop[:, int(crop_extent[1] / 2), :]), origin='lower')
+                    ax3.imshow(np.rot90(label_crop[:, :, int(crop_extent[2] / 2)]), origin='lower')
 
-                    ax4.imshow(np.rot90(image_crop[int(crop_extent[0]/2), :, :]), origin='lower', cmap="gray")
-                    ax5.imshow(np.rot90(image_crop[:, int(crop_extent[1]/2), :]), origin='lower', cmap="gray")
-                    ax6.imshow(np.rot90(image_crop[:, :, int(crop_extent[2]/2)]), origin='lower', cmap="gray")
+                    ax4.imshow(np.rot90(image_crop[int(crop_extent[0] / 2), :, :]), origin='lower', cmap="gray")
+                    ax5.imshow(np.rot90(image_crop[:, int(crop_extent[1] / 2), :]), origin='lower', cmap="gray")
+                    ax6.imshow(np.rot90(image_crop[:, :, int(crop_extent[2] / 2)]), origin='lower', cmap="gray")
 
                     # save the image
                     # check we have a directory to save the images
@@ -278,11 +410,11 @@ def crop(organ):
 
 def main():
     resample()
-    #organs = ["right kidney", "left kidney", "liver", "pancreas"]
+    organs = ["left kidney", "right kidney", "liver", "pancreas"]
 
-    #for organ in organs:
-    #    getExtents(organ)
-    #    crop(organ)
+    for organ in organs:
+        getExtents(organ)
+        #crop(organ)
 
 
 if __name__ == "__main__":
