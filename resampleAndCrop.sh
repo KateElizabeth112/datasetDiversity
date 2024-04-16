@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -l walltime=3:00:00
 #PBS -l select=1:ncpus=15:mem=60gb
-#PBS -N resample_and_crop
+#PBS -N resample_and_crop_AMOS
 
 cd ${PBS_O_WORKDIR}
 
