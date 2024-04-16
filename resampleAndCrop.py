@@ -96,7 +96,7 @@ def resample():
 
             # Check whether we need to resample (if the original and target spacing differ)
             if np.max(np.abs(np.array(original_spacing) - np.array(target_spacing))) > 0.0001:
-                print("Resampling of image {} required".format(fn))
+                print("Resampling of image {0} required from {1} to {2}".format(fn, original_spacing, target_spacing))
 
                 # Resample the image to the target voxel sizes
                 image_resampled = resample_img(image_sitk, out_spacing=target_spacing, is_label=False)
