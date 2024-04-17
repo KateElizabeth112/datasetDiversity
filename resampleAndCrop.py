@@ -421,7 +421,7 @@ def main():
 
     for organ in organs:
         getExtents(organ)
-        crop(organ)
+        #crop(organ)
 
 
 if __name__ == "__main__":
