@@ -50,7 +50,7 @@ elif dataset == "AMOS":
                   "liver": 6,
                   "pancreas": 10}
 
-    target_spacing = [0.7, 0.7, 2.0]  # target voxel size
+    target_spacing = [0.7, 0.7, 5.0]  # target voxel size
 
 image_dir = os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr")
 label_dir = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr")
@@ -253,8 +253,8 @@ def getExtents(organ):
     # Choose the maximum extents
     #crop_extent = [int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents)))]
 
-    # Choose 95th percentile extent
-    per = 95
+    # Choose Nth percentile extent
+    per = 98
     crop_extent = [int(np.percentile(np.array(x_extents), per)),
                    int(np.percentile(np.array(y_extents), per)),
                    int(np.percentile(np.array(z_extents), per))]
@@ -290,6 +290,13 @@ def crop(organ):
     f = open(os.path.join(root_dir, "{}_crop_extent.pkl".format(organ)), "rb")
     crop_extent = pkl.load(f)
     f.close()
+
+    # TODO Fix left kidney extent calculation for AMOS
+    if dataset == "AMOS":
+        if organ == "left kidney":
+            f = open(os.path.join(root_dir, "right kidney_crop_extent.pkl".format(organ)), "rb")
+            crop_extent = pkl.load(f)
+            f.close()
 
     for fn in filenames:
         if fn.endswith(".nii.gz"):
@@ -414,7 +421,7 @@ def main():
 
     for organ in organs:
         getExtents(organ)
-        #crop(organ)
+        crop(organ)
 
 
 if __name__ == "__main__":
