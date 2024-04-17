@@ -278,8 +278,6 @@ def getExtents(organ):
 
 def crop(organ):
     # Crop the images to a window of size crop_extend, centering the organ in the volume
-    print("Crop images")
-
     if dataset == "TS":
         filenames = os.listdir(label_dir)
     else:
@@ -301,6 +299,7 @@ def crop(organ):
     for fn in filenames:
         if fn.endswith(".nii.gz"):
             # Load the original label
+            print("Cropping {} from {}".format(organ, fn))
             try:
                 if dataset == "TS":
                     label_nii = nib.load(os.path.join(label_dir, fn))
@@ -416,12 +415,12 @@ def crop(organ):
 
 
 def main():
-    resample()
+    #resample()
     organs = ["left kidney", "right kidney", "liver", "pancreas"]
 
     for organ in organs:
-        getExtents(organ)
-        #crop(organ)
+        #getExtents(organ)
+        crop(organ)
 
 
 if __name__ == "__main__":
