@@ -1,5 +1,5 @@
 # Resample and crop the images in a target folder
-import nibabel as nib
+# import nibabel as nib
 import os
 import argparse
 import numpy as np
@@ -57,6 +57,9 @@ label_dir = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr")
 
 image_dir_resampled = os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_resampled")
 label_dir_resampled = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled")
+
+image_dir_cropped = os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_cropped")
+label_dir_cropped = os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_cropped")
 
 
 def resample_img(itk_image, out_spacing=[2.0, 2.0, 2.0], is_label=False):
@@ -127,18 +130,27 @@ def resample():
                     label_np_o = np.zeros(label_np.shape)
                     label_np_o[label_np == organ_idx] = 1
 
+                    # swap the order of spacing elements for numpy
+                    original_spacing_np = list(original_spacing)[::-1]
+
                     # plot each plane sliced through the centre of the image
                     plt.clf()
                     fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
                     ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
 
-                    ax1.imshow(np.rot90(label_np_o[int(label_np_o.shape[0] / 2), :, :]), origin='lower')
-                    ax2.imshow(np.rot90(label_np_o[:, int(label_np_o.shape[1] / 2), :]), origin='lower')
-                    ax3.imshow(np.rot90(label_np_o[:, :, int(label_np_o.shape[2] / 2)]), origin='lower')
+                    ax1.imshow(np.rot90(label_np_o[int(label_np_o.shape[0] / 2), :, :]), origin='lower',
+                               aspect=original_spacing_np[2] / original_spacing_np[1])
+                    ax2.imshow(np.rot90(label_np_o[:, int(label_np_o.shape[1] / 2), :]), origin='lower',
+                               aspect=original_spacing_np[2] / original_spacing_np[0])
+                    ax3.imshow(np.rot90(label_np_o[:, :, int(label_np_o.shape[2] / 2)]), origin='lower',
+                               aspect=original_spacing_np[1] / original_spacing_np[0])
 
-                    ax4.imshow(np.rot90(image_np[int(image_np.shape[0] / 2), :, :]), origin='lower', cmap="gray")
-                    ax5.imshow(np.rot90(image_np[:, int(image_np.shape[1] / 2), :]), origin='lower', cmap="gray")
-                    ax6.imshow(np.rot90(image_np[:, :, int(image_np.shape[2] / 2)]), origin='lower', cmap="gray")
+                    ax4.imshow(np.rot90(image_np[int(image_np.shape[0] / 2), :, :]), origin='lower', cmap="gray",
+                               aspect=original_spacing_np[2] / original_spacing_np[1])
+                    ax5.imshow(np.rot90(image_np[:, int(image_np.shape[1] / 2), :]), origin='lower', cmap="gray",
+                               aspect=original_spacing_np[2] / original_spacing_np[0])
+                    ax6.imshow(np.rot90(image_np[:, :, int(image_np.shape[2] / 2)]), origin='lower', cmap="gray",
+                               aspect=original_spacing_np[1] / original_spacing_np[0])
                     plt.suptitle(o)
 
                     # save the image
@@ -160,18 +172,27 @@ def resample():
                     label_np_o_resampled = np.zeros(label_np_resampled.shape)
                     label_np_o_resampled[label_np_resampled == organ_idx] = 1
 
+                    # swap order of elements in spacing array for numpy images
+                    target_spacing_np = list(target_spacing)[::-1]
+
                     # plot each plane sliced through the centre of the image
                     plt.clf()
                     fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
                     ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
 
-                    ax1.imshow(np.rot90(label_np_o_resampled[int(label_np_o_resampled.shape[0] / 2), :, :]), origin='lower')
-                    ax2.imshow(np.rot90(label_np_o_resampled[:, int(label_np_o_resampled.shape[1] / 2), :]), origin='lower')
-                    ax3.imshow(np.rot90(label_np_o_resampled[:, :, int(label_np_o_resampled.shape[2] / 2)]), origin='lower')
+                    ax1.imshow(np.rot90(label_np_o_resampled[int(label_np_o_resampled.shape[0] / 2), :, :]),
+                               origin='lower', aspect=target_spacing_np[2] / target_spacing_np[1])
+                    ax2.imshow(np.rot90(label_np_o_resampled[:, int(label_np_o_resampled.shape[1] / 2), :]),
+                               origin='lower', aspect=target_spacing_np[2] / target_spacing_np[0])
+                    ax3.imshow(np.rot90(label_np_o_resampled[:, :, int(label_np_o_resampled.shape[2] / 2)]),
+                               origin='lower', aspect=target_spacing_np[1] / target_spacing_np[0])
 
-                    ax4.imshow(np.rot90(image_np_resampled[int(image_np_resampled.shape[0] / 2), :, :]), origin='lower', cmap="gray")
-                    ax5.imshow(np.rot90(image_np_resampled[:, int(image_np_resampled.shape[1] / 2), :]), origin='lower', cmap="gray")
-                    ax6.imshow(np.rot90(image_np_resampled[:, :, int(image_np_resampled.shape[2] / 2)]), origin='lower', cmap="gray")
+                    ax4.imshow(np.rot90(image_np_resampled[int(image_np_resampled.shape[0] / 2), :, :]), origin='lower',
+                               cmap="gray", aspect=target_spacing_np[2] / target_spacing_np[1])
+                    ax5.imshow(np.rot90(image_np_resampled[:, int(image_np_resampled.shape[1] / 2), :]), origin='lower',
+                               cmap="gray", aspect=target_spacing_np[2] / target_spacing_np[0])
+                    ax6.imshow(np.rot90(image_np_resampled[:, :, int(image_np_resampled.shape[2] / 2)]), origin='lower',
+                               cmap="gray", aspect=target_spacing_np[1] / target_spacing_np[0])
                     plt.suptitle("{} Resampled".format(o))
 
                     plt.savefig(os.path.join(root_dir, "images", "resampled", o, fn[:9] + "_resampled.png"))
@@ -186,7 +207,8 @@ def resample():
                     os.mkdir(os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled"))
 
                 sitk.WriteImage(image_resampled, os.path.join(root_dir, "nnUNet_raw", ds, "imagesTr_resampled", fn))
-                sitk.WriteImage(label_resampled, os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled", fn))
+                sitk.WriteImage(label_resampled,
+                                os.path.join(root_dir, "nnUNet_raw", ds, "labelsTr_resampled", fn[:9] + ".nii.gz"))
 
 
 def getExtents(organ):
@@ -208,19 +230,19 @@ def getExtents(organ):
             try:
                 # Load the original label
                 if dataset == "TS":
-                    label_nii = nib.load(os.path.join(label_dir, fn))
+                    label_sitk = sitk.ReadImage(os.path.join(label_dir, fn))
                 else:
-                    label_nii = nib.load(os.path.join(label_dir_resampled, fn))
+                    label_sitk = sitk.ReadImage(os.path.join(label_dir_resampled, fn))
             except BadGzipFile:
                 print("The file {} did not pass CRC check".format(fn))
             except Exception as e:
                 print("An unexpected error {} occured".format(e))
             else:
                 # check that the spacing matches the target spacing
-                spacing = label_nii.header.get_zooms()
+                spacing = label_sitk.GetSpacing()
 
                 # convert label to numpy array
-                label = label_nii.get_fdata()
+                label = sitk.GetArrayFromImage(label_sitk)
 
                 if np.max(np.abs(np.array(spacing) - np.array(target_spacing))) > 0.0001:
                     raise Exception("The label {} voxel spacing of {} does not match the target {} ".format(fn,
@@ -235,13 +257,23 @@ def getExtents(organ):
                 # Check that this sums to more than zero
                 if np.sum(label_idx) > 0:
                     # sum along each pair of axes to find the maximum extent for the third axis
-                    x_sum = np.sum(label_idx, axis=1)
-                    y_sum = np.sum(label_idx, axis=2)
-                    z_sum = np.sum(label_idx, axis=0)
+                    # sum along each pair of axes to find the plane with maximum area for the third axis
+                    x_area = np.sum(label_idx, axis=(1, 2))
+                    y_area = np.sum(label_idx, axis=(0, 2))
+                    z_area = np.sum(label_idx, axis=(0, 1))
 
-                    x_extents.append(np.max(x_sum))
-                    y_extents.append(np.max(y_sum))
-                    z_extents.append(np.max(z_sum))
+                    # find the index of the start and end point, and the origin as the midpoint
+                    x_1 = np.nonzero(x_area)[0][0]
+                    x_2 = np.nonzero(x_area)[0][-1]
+                    x_extents.append(int(x_2 - x_1))
+
+                    y_1 = np.nonzero(y_area)[0][0]
+                    y_2 = np.nonzero(y_area)[0][-1]
+                    y_extents.append(int(y_2 - y_1))
+
+                    z_1 = np.nonzero(z_area)[0][0]
+                    z_2 = np.nonzero(z_area)[0][-1]
+                    z_extents.append(int(z_2 - z_1))
                 else:
                     print("The organ with index {} does not have any labels for image {}".format(organ_idx, fn))
 
@@ -251,7 +283,7 @@ def getExtents(organ):
     f.close()
 
     # Choose the maximum extents
-    #crop_extent = [int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents)))]
+    # crop_extent = [int(np.max(np.array(x_extents))), int(np.max(np.array(y_extents))), int(np.max(np.array(z_extents)))]
 
     # Choose Nth percentile extent
     per = 98
@@ -282,6 +314,7 @@ def crop(organ):
         filenames = os.listdir(label_dir)
     else:
         filenames = os.listdir(label_dir_resampled)
+
     organ_idx = organ_dict.get(organ)
 
     # open the crop extents for the dataset and the organ
@@ -289,28 +322,29 @@ def crop(organ):
     crop_extent = pkl.load(f)
     f.close()
 
-    # TODO Fix left kidney extent calculation for AMOS
-    if dataset == "AMOS":
-        if organ == "left kidney":
-            f = open(os.path.join(root_dir, "right kidney_crop_extent.pkl".format(organ)), "rb")
-            crop_extent = pkl.load(f)
-            f.close()
-
     for fn in filenames:
         if fn.endswith(".nii.gz"):
             # Load the original label
             print("Cropping {} from {}".format(organ, fn))
             try:
                 if dataset == "TS":
-                    label_nii = nib.load(os.path.join(label_dir, fn))
+                    label_sitk = sitk.ReadImage(os.path.join(label_dir, fn))
                     # load the corresponding image
-                    image_nii = nib.load(os.path.join(image_dir, fn[:9] + "_0000.nii.gz"))
+                    image_sitk = sitk.ReadImage(os.path.join(image_dir, fn[:9] + "_0000.nii.gz"))
                 else:
-                    label_nii = nib.load(os.path.join(label_dir_resampled, fn))
+                    label_sitk = sitk.ReadImage(os.path.join(label_dir_resampled, fn))
                     # load the corresponding image
-                    image_nii = nib.load(os.path.join(image_dir_resampled, fn[:9] + "_0000.nii.gz"))
-                label = label_nii.get_fdata()  # convert label to numpy array
-                image = image_nii.get_fdata()  # convert image to numpy array
+                    image_sitk = sitk.ReadImage(os.path.join(image_dir_resampled, fn[:9] + "_0000.nii.gz"))
+
+                # Get the spacing and make sure it is equal
+                label_spacing = label_sitk.GetSpacing()
+                image_spacing = image_sitk.GetSpacing()
+
+                # the spacing in numpy has the order of elements reversed
+                spacing_np = list(label_spacing)[::-1]
+
+                label = sitk.GetArrayFromImage(label_sitk)  # convert label to numpy array
+                image = sitk.GetArrayFromImage(image_sitk)  # convert image to numpy array
             except BadGzipFile:
                 print("File {} failed CRC check".format(fn))
             except Exception as e:
@@ -350,6 +384,54 @@ def crop(organ):
                     z_min = int(z_0 - crop_extent[2] / 2)
                     z_max = int(z_0 + crop_extent[2] / 2)
 
+                    # DEBUG
+                    # Plot the label and image prior to cropping, sliced though the mid-crop planes
+                    plt.clf()
+                    fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
+                    ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
+
+                    ax1.imshow(np.rot90(label_idx[x_min + int(crop_extent[0] / 2), :, :]), origin='lower',
+                               aspect=spacing_np[2] / spacing_np[1])
+                    ax1.set_title("Y-Z Plane")
+                    ax1.axvline(y_min, color='r')
+                    ax1.axvline(y_max, color='r')
+                    ax1.axhline(label_idx.shape[2] - z_min, color="r")
+                    ax1.axhline(label_idx.shape[2] - z_max, color="r")
+
+                    ax2.imshow(np.rot90(label_idx[:, y_min + int(crop_extent[1] / 2), :]), origin='lower',
+                               aspect=spacing_np[2] / spacing_np[0])
+                    ax2.set_title("X-Z Plane")
+                    ax2.axvline(x_min, color='r')
+                    ax2.axvline(x_max, color='r')
+                    ax2.axhline(label_idx.shape[2] - z_min, color="r")
+                    ax2.axhline(label_idx.shape[2] - z_max, color="r")
+
+                    ax3.imshow(np.rot90(label_idx[:, :, z_min + int(crop_extent[2] / 2)]), origin='lower',
+                               aspect=spacing_np[1] / spacing_np[0])
+                    ax3.set_title("X-Y Plane")
+                    ax3.axvline(x_min, color='r')
+                    ax3.axvline(x_max, color='r')
+                    ax3.axhline(label_idx.shape[1] - y_min, color="r")
+                    ax3.axhline(label_idx.shape[1] - y_max, color="r")
+
+                    ax4.imshow(np.rot90(image[x_min + int(crop_extent[0] / 2), :, :]), origin='lower', cmap="gray",
+                               aspect=spacing_np[2] / spacing_np[1])
+                    ax5.imshow(np.rot90(image[:, y_min + int(crop_extent[1] / 2), :]), origin='lower', cmap="gray",
+                               aspect=spacing_np[2] / spacing_np[0])
+                    ax6.imshow(np.rot90(image[:, :, z_min + int(crop_extent[2] / 2)]), origin='lower', cmap="gray",
+                               aspect=spacing_np[1] / spacing_np[0])
+
+                    # save the image
+                    # check we have a directory to save the images
+                    if not os.path.exists(os.path.join(root_dir, "images", "crops")):
+                        os.mkdir(os.path.join(root_dir, "images", "crops"))
+
+                    if not os.path.exists(os.path.join(root_dir, "images", "crops", organ)):
+                        os.mkdir(os.path.join(root_dir, "images", "crops", organ))
+
+                    plt.savefig(os.path.join(root_dir, "images", "crops", organ, fn[:9] + "_full.png"))
+                    plt.close()
+
                     # crop the label and image
                     label_crop = label_idx[np.max((0, x_min)):x_max, np.max((0, y_min)):y_max, np.max((0, z_min)):z_max]
                     image_crop = image[np.max((0, x_min)):x_max, np.max((0, y_min)):y_max, np.max((0, z_min)):z_max]
@@ -375,7 +457,7 @@ def crop(organ):
                         label_crop_padded = np.zeros(crop_extent)
                         image_crop_padded = np.zeros(crop_extent)
 
-                        label_crop_padded.fill(0.5)
+                        label_crop_padded.fill(2)
                         image_crop_padded.fill(np.mean(image_crop))
 
                         label_crop_padded[x_min_offset:x_min_offset + label_crop.shape[0],
@@ -394,32 +476,54 @@ def crop(organ):
                     fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(16, 6))
                     ax1, ax2, ax3, ax4, ax5, ax6 = axes.flatten()
 
-                    ax1.imshow(np.rot90(label_crop[int(crop_extent[0] / 2), :, :]), origin='lower')
-                    ax2.imshow(np.rot90(label_crop[:, int(crop_extent[1] / 2), :]), origin='lower')
-                    ax3.imshow(np.rot90(label_crop[:, :, int(crop_extent[2] / 2)]), origin='lower')
+                    ax1.imshow(np.rot90(label_crop[int(crop_extent[0] / 2), :, :]), origin='lower',
+                               aspect=spacing_np[2] / spacing_np[1])
+                    ax1.set_title("Y-Z Plane")
+                    ax2.imshow(np.rot90(label_crop[:, int(crop_extent[1] / 2), :]), origin='lower',
+                               aspect=spacing_np[2] / spacing_np[0])
+                    ax2.set_title("X-Z Plane")
+                    ax3.imshow(np.rot90(label_crop[:, :, int(crop_extent[2] / 2)]), origin='lower',
+                               aspect=spacing_np[1] / spacing_np[0])
+                    ax3.set_title("X-Y Plane")
 
-                    ax4.imshow(np.rot90(image_crop[int(crop_extent[0] / 2), :, :]), origin='lower', cmap="gray")
-                    ax5.imshow(np.rot90(image_crop[:, int(crop_extent[1] / 2), :]), origin='lower', cmap="gray")
-                    ax6.imshow(np.rot90(image_crop[:, :, int(crop_extent[2] / 2)]), origin='lower', cmap="gray")
-
-                    # save the image
-                    # check we have a directory to save the images
-                    if not os.path.exists(os.path.join(root_dir, "images", "crops")):
-                        os.mkdir(os.path.join(root_dir, "images", "crops"))
-
-                    if not os.path.exists(os.path.join(root_dir, "images", "crops", organ)):
-                        os.mkdir(os.path.join(root_dir, "images", "crops", organ))
+                    ax4.imshow(np.rot90(image_crop[int(crop_extent[0] / 2), :, :]), origin='lower', cmap="gray",
+                               aspect=spacing_np[2] / spacing_np[1])
+                    ax5.imshow(np.rot90(image_crop[:, int(crop_extent[1] / 2), :]), origin='lower', cmap="gray",
+                               aspect=spacing_np[2] / spacing_np[0])
+                    ax6.imshow(np.rot90(image_crop[:, :, int(crop_extent[2] / 2)]), origin='lower', cmap="gray",
+                               aspect=spacing_np[1] / spacing_np[0])
 
                     plt.savefig(os.path.join(root_dir, "images", "crops", organ, fn[:9] + ".png"))
                     plt.close()
 
+                    # convert image and label to sitk and set up the basic metadata
+                    label_crop_sitk = sitk.GetImageFromArray(label_crop)
+                    image_crop_sitk = sitk.GetImageFromArray(image_crop)
+
+                    label_crop_sitk.SetDirection(label_sitk.GetDirection())
+                    image_crop_sitk.SetDirection(image_sitk.GetDirection())
+
+                    label_crop_sitk.SetSpacing(label_sitk.GetSpacing())
+                    image_crop_sitk.SetSpacing(image_sitk.GetSpacing())
+
+                    # Save the cropped image and label with appropriate metadata
+                    if not os.path.exists(image_dir_cropped):
+                        os.mkdir(image_dir_cropped)
+
+                    if not os.path.exists(label_dir_cropped):
+                        os.mkdir(label_dir_cropped)
+
+                    # TODO Fix naming
+                    sitk.WriteImage(label_crop_sitk, os.path.join(label_dir_cropped, fn[:9] + ".nii.gz"))
+                    sitk.WriteImage(image_crop_sitk, os.path.join(image_dir_cropped, fn))
+
 
 def main():
-    #resample()
+    # resample()
     organs = ["left kidney", "right kidney", "liver", "pancreas"]
 
     for organ in organs:
-        #getExtents(organ)
+        getExtents(organ)
         crop(organ)
 
 
